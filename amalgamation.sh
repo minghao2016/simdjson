@@ -151,11 +151,11 @@ int main(int argc, char *argv[]) {
   }
   const char * filename = argv[1];
   simdjson::padded_string p = simdjson::get_corpus(filename);
-  simdjson::document doc;
-  if (!simdjson::document::try_parse(p, doc)) { // do the parsing
-    std::cout << "document::try_parse not valid" << std::endl;
+  auto [doc, error] = simdjson::document::parse(p); // do the parsing
+  if (error) {
+    std::cout << "document::parse not valid" << std::endl;
   } else {
-    std::cout << "document::try_parse valid" << std::endl;
+    std::cout << "document::parse valid" << std::endl;
   }
   if(argc == 2) {
     return EXIT_SUCCESS;

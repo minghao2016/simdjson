@@ -24,6 +24,8 @@ public:
   parser &operator=(parser &&o) = default;
   parser &operator=(const parser &o) = delete;
 
+  class doc_ref_result;
+
   //
   // Parse a JSON document and return a reference to it.
   //
@@ -33,72 +35,10 @@ public:
   //
   // Throws invalid_json if the JSON is invalid.
   //
-  const document &parse(const uint8_t *buf, size_t len, bool realloc_if_needed = true);
-  const document &parse(const char *buf, size_t len, bool realloc_if_needed = true) {
-    return parse((const uint8_t *)buf, len, realloc_if_needed);
-  }
-  const document &parse(const std::string &s, bool realloc_if_needed = true) {
-    return parse(s.data(), s.length(), realloc_if_needed);
-  }
-  const document &parse(const padded_string &s) {
-    return parse(s.data(), s.length(), false);
-  }
-
-  //
-  // Parse a JSON document and take the result.
-  //
-  // The document can be used even after the parser is deallocated or parse() is called again.
-  //
-  // Throws invalid_json if the JSON is invalid.
-  //
-  document parse_new(const uint8_t *buf, size_t len, bool realloc_if_needed = true);
-  document parse_new(const char *buf, size_t len, bool realloc_if_needed = true) {
-    return parse_new((const uint8_t *)buf, len, realloc_if_needed);
-  }
-  document parse_new(const std::string &s, bool realloc_if_needed = true) {
-    return parse_new(s.data(), s.length(), realloc_if_needed);
-  }
-  document parse_new(const padded_string &s) {
-    return parse_new(s.data(), s.length(), false);
-  }
-
-  //
-  // Parse a JSON document and set doc to a pointer to it.
-  //
-  // The JSON document still lives in the parser: this is the most efficient way to parse JSON
-  // documents because it reuses the same buffers, but you *must* use the document before you
-  // destroy the parser or call parse() again.
-  //
-  // Returns != SUCCESS if the JSON is invalid.
-  //
-  WARN_UNUSED error_code try_parse(const uint8_t *buf, size_t len, const document *& dst, bool realloc_if_needed = true) noexcept;
-  WARN_UNUSED error_code try_parse(const char *buf, size_t len, const document *& dst, bool realloc_if_needed = true) noexcept {
-    return try_parse((const uint8_t *)buf, len, dst, realloc_if_needed);
-  }
-  WARN_UNUSED error_code try_parse(const std::string &s, const document *&dst, bool realloc_if_needed = true) noexcept {
-    return try_parse(s.data(), s.length(), dst, realloc_if_needed);
-  }
-  WARN_UNUSED error_code try_parse(const padded_string &s, const document *&dst) noexcept {
-    return try_parse(s.data(), s.length(), dst, false);
-  }
-
-  //
-  // Parse a JSON document and fill in dst.
-  //
-  // The document can be used even after the parser is deallocated or parse() is called again.
-  //
-  // Returns != SUCCESS if the JSON is invalid.
-  //
-  WARN_UNUSED error_code try_parse_into(const uint8_t *buf, size_t len, document &dst, bool realloc_if_needed = true) noexcept;
-  WARN_UNUSED error_code try_parse_into(const char *buf, size_t len, document &dst, bool realloc_if_needed = true) noexcept {
-    return try_parse_into((const uint8_t *)buf, len, dst, realloc_if_needed);
-  }
-  WARN_UNUSED error_code try_parse_into(const std::string &s, document &dst, bool realloc_if_needed = true) noexcept {
-    return try_parse_into(s.data(), s.length(), dst, realloc_if_needed);
-  }
-  WARN_UNUSED error_code try_parse_into(const padded_string &s, document &dst) noexcept {
-    return try_parse_into(s.data(), s.length(), dst, false);
-  }
+  doc_ref_result parse(const uint8_t *buf, size_t len, bool realloc_if_needed = true);
+  doc_ref_result parse(const char *buf, size_t len, bool realloc_if_needed = true);
+  doc_ref_result parse(const std::string &s, bool realloc_if_needed = true);
+  doc_ref_result parse(const padded_string &s);
 
   //
   // Current capacity: the largest document this parser can support without reallocating.
@@ -123,6 +63,7 @@ public:
   // type aliases for backcompat
   using Iterator = document::iterator;
   using InvalidJSON = invalid_json;
+  class doc_result;
 
   // Next location to write to in the tape
   uint32_t current_loc{0};
@@ -323,8 +264,6 @@ private:
     doc.tape[saved_loc] |= val;
   }
 
-  WARN_UNUSED error_code try_parse(const uint8_t *buf, size_t len, bool realloc_if_needed) noexcept;
-
   //
   // Set the current capacity: the largest document this parser can support without reallocating.
   //
@@ -343,6 +282,35 @@ private:
   //
   WARN_UNUSED bool set_max_depth(size_t max_depth);
 };
+
+class document::parser::doc_ref_result {
+private:
+  doc_ref_result(document &_doc, error_code _error) : doc(_doc), error(_error) { }
+  friend class document::parser;
+public:
+  ~doc_ref_result()=default;
+
+  operator bool() noexcept { return error == SUCCESS; }
+  operator document&() {
+    if (!*this) {
+      throw invalid_json(error);
+    }
+    return doc;
+  }
+  document& doc;
+  error_code error;
+};
+
+inline document::parser::doc_ref_result document::parser::parse(const char *buf, size_t len, bool realloc_if_needed) {
+  return parse((const uint8_t *)buf, len, realloc_if_needed);
+}
+inline document::parser::doc_ref_result document::parser::parse(const std::string &s, bool realloc_if_needed) {
+  return parse(s.data(), s.length(), realloc_if_needed);
+}
+inline document::parser::doc_ref_result document::parser::parse(const padded_string &s) {
+  return parse(s.data(), s.length(), false);
+}
+
 
 } // namespace simdjson
 
